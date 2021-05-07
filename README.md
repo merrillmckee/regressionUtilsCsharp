@@ -8,7 +8,7 @@ Here is an example that may apply to edge points detected in an image at a corne
 
 Anscombe's quartet is four sets of data that have virtually the same linear regression function.  In 3 of the 4 cases, outliers have a noticeable impact.  Two of the cases, a single outlier is enough to make the linear regression of poorer to unusable quality.  This quartet helps demonstate the sensitivity of common regression tools to outliers.  For more reading see https://en.wikipedia.org/wiki/Anscombe%27s_quartet.
 
-The following 4 images are linear regression on the Anscombe's quartet:
+The following images illustrate linear regression on the Anscombe's quartet:
 
 ![image](https://user-images.githubusercontent.com/79757625/117516460-260fe400-af67-11eb-94b9-02d05308799f.png)
 ![image](https://user-images.githubusercontent.com/79757625/117516341-db8e6780-af66-11eb-9e51-ccb08444e5d1.png)
