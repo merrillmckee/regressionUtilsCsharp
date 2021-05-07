@@ -1,1 +1,2 @@
+This repository contains statistical regression utilities written in CSharp in Visual Studio 2019.  The utilities include standard least-squares linear, quadratic, cubic, and elliptical regression.  In addition to standard least squares regression, they contain "consensus regression" that automatically detects outliers in a dataset, removes them from the inliers, and updates the least-squares regression model quickly.
 
