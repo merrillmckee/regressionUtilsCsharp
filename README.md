@@ -20,7 +20,6 @@ Some examples of quadratic regression and quadratic regression consensus:
 ![image](https://user-images.githubusercontent.com/79757625/117516567-83a43080-af67-11eb-9d4b-84a0e41f2d5a.png)
 ![image](https://user-images.githubusercontent.com/79757625/117516609-93bc1000-af67-11eb-92a5-242812e3ede4.png)
 ![image](https://user-images.githubusercontent.com/79757625/117516620-99b1f100-af67-11eb-9a48-621b33d128f4.png)
-![image](https://user-images.githubusercontent.com/79757625/117516630-a0406880-af67-11eb-9c7c-d0957c7e86a7.png)
 ![image](https://user-images.githubusercontent.com/79757625/117517211-4771cf80-af69-11eb-87f0-b6fd0b0b2bf5.png)
 ![image](https://user-images.githubusercontent.com/79757625/117516643-a6cee000-af67-11eb-993d-a34d4b61a81e.png)
 ![image](https://user-images.githubusercontent.com/79757625/117516653-acc4c100-af67-11eb-8e20-a21fa2e6a496.png)
