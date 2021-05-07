@@ -1,0 +1,25 @@
+﻿
+Microsoft Visual Studio Solution File, Format Version 12.00
+# Visual Studio Version 16
+VisualStudioVersion = 16.0.31112.23
+MinimumVisualStudioVersion = 10.0.40219.1
+Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "RegressionUtilz", "RegressionUtilz\RegressionUtilz.csproj", "{C7D35D7C-33EE-444A-A139-2C2E6AC5826C}"
+EndProject
+Global
+	GlobalSection(SolutionConfigurationPlatforms) = preSolution
+		Debug|Any CPU = Debug|Any CPU
+		Release|Any CPU = Release|Any CPU
+	EndGlobalSection
+	GlobalSection(ProjectConfigurationPlatforms) = postSolution
+		{C7D35D7C-33EE-444A-A139-2C2E6AC5826C}.Debug|Any CPU.ActiveCfg = Debug|Any CPU
+		{C7D35D7C-33EE-444A-A139-2C2E6AC5826C}.Debug|Any CPU.Build.0 = Debug|Any CPU
+		{C7D35D7C-33EE-444A-A139-2C2E6AC5826C}.Release|Any CPU.ActiveCfg = Release|Any CPU
+		{C7D35D7C-33EE-444A-A139-2C2E6AC5826C}.Release|Any CPU.Build.0 = Release|Any CPU
+	EndGlobalSection
+	GlobalSection(SolutionProperties) = preSolution
+		HideSolutionNode = FALSE
+	EndGlobalSection
+	GlobalSection(ExtensibilityGlobals) = postSolution
+		SolutionGuid = {62A53983-F735-4EE9-9B57-07129271C205}
+	EndGlobalSection
+EndGlobal
