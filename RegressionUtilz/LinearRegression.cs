@@ -3,7 +3,6 @@ using System.Collections.Generic;
 using System.Drawing;
 
 using enmIndependentVariable = Tools.RegressionUtilities.PolynomialModel.enmIndependentVariable;
-using Bias = Tools.RegressionUtilities.PolynomialModel.Bias;
 
 namespace Tools.RegressionUtilities
 {
@@ -52,14 +51,28 @@ namespace Tools.RegressionUtilities
             internal LineCoefficients coefficients;
             internal double slope;
             internal double intercept;
-            internal Bias bias;
 
-            public LineModel()
+            public LineModel(enmIndependentVariable independentVariable)
             {
                 _degree = DegreeOfPolynomial.Linear;
+                MinimumPoints = 2;
+                this.independentVariable = independentVariable;
             }
 
-            #region Internal Properties of LineModel
+            public LineModel(LineModel copy) : base(copy)
+            {
+                coefficients = copy.coefficients;
+                slope = copy.slope;
+                intercept = copy.intercept;
+                b1 = copy.b1;
+                b2 = copy.b2;
+            }
+
+            public override RegressionModel Clone()
+            {
+                return new LineModel(this);
+            }
+
             internal double b1
             {
                 get { return coefficients.b1; }
@@ -71,9 +84,6 @@ namespace Tools.RegressionUtilities
                 get { return coefficients.b2; }
                 set { coefficients.b2 = value; }
             }
-            #endregion
-
-            #region Public Properties of LineModel
 
             // Get the coefficients of   y = b1 + b2 * x   -OR-   x = b1 + b2 * y
             public LineCoefficients Coefficients
@@ -96,13 +106,12 @@ namespace Tools.RegressionUtilities
                     }
                 }
             }
-            #endregion
 
             public override float ModeledY(float x)
             {
                 if (ValidRegressionModel && independentVariable == enmIndependentVariable.X)
                 {
-                    return (float)(b1 + b2 * (double)x);
+                    return (float)(b1 + b2 * x);
                 }
                 else
                 {
@@ -114,500 +123,174 @@ namespace Tools.RegressionUtilities
             {
                 if (ValidRegressionModel && independentVariable == enmIndependentVariable.Y)
                 {
-                    return (float)(b1 + b2 * (double)y);
+                    return (float)(b1 + b2 * y);
                 }
                 else
                 {
                     return float.MinValue;
                 }
             }
-        }
 
-        public struct LinearConsensusModel
-        {
-            internal List<PointF> inliers;
-            internal List<PointF> outliers;
-
-            #region Public Properties of LinearConsensusModel
-            public LineModel model;
-            public LineModel original;
-
-            public List<PointF> Inliers
+            protected class LinearSummations : Summations
             {
-                get
+                public double x2;
+                public double xy;
+            }
+
+            public override Summations CalculateSummations(List<PointF> points)
+            {
+                var sum = new LinearSummations();
+                if (points == null || points.Count < MinimumPoints)
                 {
-                    if (model.ValidRegressionModel)
+                    sum.N = 0;
+                    return sum;
+                }
+
+                // Initialize all the summations to zero
+                sum.x = 0.0;
+                sum.y = 0.0;
+                sum.x2 = 0.0;
+                sum.xy = 0.0;
+
+                // Shorthand that better matches the math formulas
+                var N = sum.N = points.Count;
+
+                // Calculate the summations
+                for (var i = 0; i < N; ++i)
+                {
+                    // Shorthand
+                    var x = points[i].X;
+                    var y = points[i].Y;
+
+                    // Meh
+                    if (independentVariable == enmIndependentVariable.Y)
                     {
-                        return inliers;
+                        // Swap the x and y coordinates to handle a y independent variable
+                        x = points[i].Y;
+                        y = points[i].X;
                     }
-                    else
-                    {
-                        return new List<PointF>();
-                    }
-                }
-            }
 
-            public List<PointF> Outliers
-            {
-                get
-                {
-                    if (model.ValidRegressionModel)
-                    {
-                        return outliers;
-                    }
-                    else
-                    {
-                        return new List<PointF>();
-                    }
-                }
-            }
+                    var xx = x * x;
+                    var xy = x * y;
 
-            public double b1
-            {
-                get { return model.b1; }
-            }
-
-            public double b2
-            {
-                get { return model.b2; }
-            }
-
-            // AverageRegressionError
-            public float AverageRegressionError
-            {
-                get
-                {
-                    if (model.ValidRegressionModel)
-                    {
-                        if (model.AverageRegressionError <= 0.0f || model.AverageRegressionError > 99999.9f)
-                        {
-                            model.AverageRegressionError = model.CalculateAverageRegressionError(inliers);
-                        }
-
-                        return model.AverageRegressionError;
-                    }
-                    else
-                    {
-                        return float.MaxValue;
-                    }
-                }
-            }
-            #endregion
-        }
-
-        internal struct LinearSummations
-        {
-            // Initialize all the summations to zero
-            internal int N;
-            internal double x;
-            internal double y;
-            internal double x2;
-            internal double xy;
-        }
-
-        public static LinearConsensusModel CalculateLinearRegressionConsensus(List<PointF> points, enmIndependentVariable independentVariable = enmIndependentVariable.X, float sensitivityInPixels = ERROR_THRESHOLD_ORIGINAL)
-        {
-            var linearRegressionConsensus = new LinearConsensusModel();
-
-            if (points == null || points.Count < 2)
-            {
-                // Exit with error
-                return linearRegressionConsensus;
-            }
-
-            // Calculate the initial model.  Set the initial inliers and outliers (empty) lists.
-            linearRegressionConsensus.inliers = points;
-            linearRegressionConsensus.outliers = new List<PointF>();
-            linearRegressionConsensus.model = CalculateLinearRegressionModel(linearRegressionConsensus.inliers, independentVariable);
-            linearRegressionConsensus.original = linearRegressionConsensus.model;
-
-            // Keep removing candidate points until the model is lower than some average error threshold
-            while (linearRegressionConsensus.model.AverageRegressionError > sensitivityInPixels && linearRegressionConsensus.model.ValidRegressionModel)
-            {
-                int index1, index2, index3;
-                var pointsWithoutPoint1 = new List<PointF>();
-                var pointsWithoutPoint2 = new List<PointF>();
-                var pointsWithoutPoint3 = new List<PointF>();
-                var candidatePoint1 = GetPositiveCandidate(linearRegressionConsensus.inliers, linearRegressionConsensus.model, out index1, out pointsWithoutPoint1);
-                var candidatePoint2 = GetNegativeCandidate(linearRegressionConsensus.inliers, linearRegressionConsensus.model, out index2, out pointsWithoutPoint2);
-                var candidatePoint3 = GetInfluenceCandidate(linearRegressionConsensus.inliers, linearRegressionConsensus.model, out index3, out pointsWithoutPoint3);
-
-                if (candidatePoint1.IsEmpty || candidatePoint2.IsEmpty || candidatePoint3.IsEmpty || index1 < 0 || index2 < 0 || index3 < 0)
-                {
-                    // Exit with error
-                    break;
+                    // Sums
+                    sum.x += x;
+                    sum.y += y;
+                    sum.x2 += xx;
+                    sum.xy += xy;
                 }
 
-                //var error1 = CalculateResidual(linearRegressionConsensus.model, candidatePoint1);
-                //var error2 = CalculateResidual(linearRegressionConsensus.model, candidatePoint2);
-                //var error3 = CalculateResidual(linearRegressionConsensus.model, candidatePoint3);
-
-                var modelWithoutPoint1 = new LineModel();
-                var modelWithoutPoint2 = new LineModel();
-                var modelWithoutPoint3 = new LineModel();
-                var newAverageError1 = RemovePointAndCalculateError(pointsWithoutPoint1, independentVariable, out modelWithoutPoint1);
-                var newAverageError2 = RemovePointAndCalculateError(pointsWithoutPoint2, independentVariable, out modelWithoutPoint2);
-                var newAverageError3 = RemovePointAndCalculateError(pointsWithoutPoint3, independentVariable, out modelWithoutPoint3);
-
-                if (newAverageError1 < newAverageError2 && newAverageError1 < newAverageError3)
-                {
-                    linearRegressionConsensus.inliers = pointsWithoutPoint1;
-                    linearRegressionConsensus.outliers.Add(candidatePoint1);
-                    linearRegressionConsensus.model = modelWithoutPoint1;
-                }
-                else if (newAverageError2 < newAverageError3)
-                {
-                    linearRegressionConsensus.inliers = pointsWithoutPoint2;
-                    linearRegressionConsensus.outliers.Add(candidatePoint2);
-                    linearRegressionConsensus.model = modelWithoutPoint2;
-                }
-                else
-                {
-                    linearRegressionConsensus.inliers = pointsWithoutPoint3;
-                    linearRegressionConsensus.outliers.Add(candidatePoint3);
-                    linearRegressionConsensus.model = modelWithoutPoint3;
-                }
-            }
-
-            return linearRegressionConsensus;
-        }
-
-        private static PointF GetPositiveCandidate(List<PointF> points, LineModel model, out int index, out List<PointF> pointsWithoutCandidate)
-        {
-            if (points == null || points.Count <= 2)
-            {
-                index = -1;
-                pointsWithoutCandidate = new List<PointF>();
-                return new PointF();
-            }
-
-            var maxRegressionError = float.MinValue;
-            index = 0;
-            for (var i = 0; i < points.Count; ++i)
-            {
-                var point = points[i];
-                bool pointOnPositiveSide;
-                var error = CalculateGeometricError(model, point, out pointOnPositiveSide);
-
-                if (pointOnPositiveSide)
-                {
-                    if (error > maxRegressionError)
-                    {
-                        maxRegressionError = error;
-                        index = i;
-                    }
-                }
-            }
-
-            pointsWithoutCandidate = new List<PointF>(points);
-            pointsWithoutCandidate.RemoveAt(index);
-
-            return points[index];
-        }
-
-        private static PointF GetNegativeCandidate(List<PointF> points, LineModel model, out int index, out List<PointF> pointsWithoutCandidate)
-        {
-            if (points == null || points.Count <= 2)
-            {
-                index = -1;
-                pointsWithoutCandidate = new List<PointF>();
-                return new PointF();
-            }
-
-            var maxRegressionError = float.MinValue;
-            index = 0;
-            for (var i = 0; i < points.Count; ++i)
-            {
-                var point = points[i];
-                bool pointOnPositiveSide;
-                var error = CalculateGeometricError(model, point, out pointOnPositiveSide);
-
-                if (!pointOnPositiveSide)
-                {
-                    if (error > maxRegressionError)
-                    {
-                        maxRegressionError = error;
-                        index = i;
-                    }
-                }
-            }
-
-            pointsWithoutCandidate = new List<PointF>(points);
-            pointsWithoutCandidate.RemoveAt(index);
-
-            return points[index];
-        }
-
-        private static PointF GetInfluenceCandidate(List<PointF> points, LineModel model, out int index, out List<PointF> pointsWithoutCandidate)
-        {
-            if (points == null || points.Count <= 2)
-            {
-                index = -1;
-                pointsWithoutCandidate = new List<PointF>();
-                return new PointF();
-            }
-
-            var maximumInfluence = 0.0f;
-            index = 0;
-            for (var i = 0; i < points.Count; ++i)
-            {
-                var point = points[i];
-                var influence = (float)(Math.Abs(point.X - model.bias.x + point.Y - model.bias.y));
-                if (influence > maximumInfluence)
-                {
-                    maximumInfluence = influence;
-                    index = i;
-                }
-            }
-
-            pointsWithoutCandidate = new List<PointF>(points);
-            pointsWithoutCandidate.RemoveAt(index);
-
-            return points[index];
-        }
-
-        // Calculate geometric error (Euclidean distance; point-to-line)
-        protected static float CalculateGeometricError(LineModel line, PointF point, out bool pointOnPositiveSide)
-        {
-            if (line == null || point == null)
-            {
-                pointOnPositiveSide = false;
-                return float.MaxValue;
-            }
-
-            if (line.independentVariable == enmIndependentVariable.X)
-            {
-                var numerator = -line.b2 * point.X + point.Y - line.b1;
-
-                pointOnPositiveSide = true;
-                if (numerator < 0.0f)
-                {
-                    pointOnPositiveSide = false;
-                }
-
-                return (float)(Math.Abs(numerator) / Math.Sqrt(line.b2 * line.b2 + 1.0));
-            }
-            else
-            {
-                var numerator = -line.b2 * point.Y + point.X - line.b1;
-
-                pointOnPositiveSide = true;
-                if (numerator < 0.0f)
-                {
-                    pointOnPositiveSide = false;
-                }
-
-                return (float)(Math.Abs(numerator) / Math.Sqrt(line.b2 * line.b2 + 1.0));
-            }
-        }
-
-        public static LineModel CalculateLinearRegressionModel(List<PointF> points, enmIndependentVariable independentVariable = enmIndependentVariable.X)
-        {
-            var linearRegressionModel = new LineModel();
-            linearRegressionModel.independentVariable = independentVariable;
-
-            // Calculate the bias
-            var bias = PolynomialModel.CalculateBias(points);
-            if (bias.x == double.MaxValue)
-            {
-                linearRegressionModel.ValidRegressionModel = false;
-                return linearRegressionModel;
-            }
-            linearRegressionModel.bias = bias;
-
-            // Remove the bias
-            var pointsNoBias = PolynomialModel.RemoveBias(points, bias);
-            if (pointsNoBias == null || pointsNoBias.Count == 0)
-            {
-                linearRegressionModel.ValidRegressionModel = false;
-                return linearRegressionModel;
-            }
-
-            // Calculate the summations on the points after the bias has been removed
-            var sum = CalculateLinearSummations(linearRegressionModel.independentVariable, pointsNoBias);
-            if (sum.N <= 0)
-            {
-                linearRegressionModel.ValidRegressionModel = false;
-                return linearRegressionModel;
-            }
-
-            // Calculate the initial regression model
-            linearRegressionModel = CalculateInitialLinearModel(sum, bias, linearRegressionModel.independentVariable);
-            if (!linearRegressionModel.ValidRegressionModel)
-            {
-                linearRegressionModel.ValidRegressionModel = false;
-                return linearRegressionModel;
-            }
-
-            // Calculate the line features
-            CalculateLineFeatures(ref linearRegressionModel);
-            if (!linearRegressionModel.ValidRegressionModel)
-            {
-                linearRegressionModel.ValidRegressionModel = false;
-                return linearRegressionModel;
-            }
-
-            // Calculate the average residual error
-            linearRegressionModel.AverageRegressionError = linearRegressionModel.CalculateAverageRegressionError(points);
-            if (linearRegressionModel.AverageRegressionError >= float.MaxValue)
-            {
-                linearRegressionModel.ValidRegressionModel = false;
-            }
-
-            return linearRegressionModel;
-        }
-
-        private static float RemovePointAndCalculateError(List<PointF> pointsWithoutCandidate, enmIndependentVariable independentVariable, out LineModel modelWithoutCandidate)
-        {
-            modelWithoutCandidate = CalculateLinearRegressionModel(pointsWithoutCandidate, independentVariable);
-            return modelWithoutCandidate.AverageRegressionError;
-        }
-
-        public static float CalculateResidual(LineModel model, PointF point)
-        {
-            if (model == null || point == null)
-            {
-                return float.MaxValue;
-            }
-
-            if (model.independentVariable == enmIndependentVariable.X)
-            {
-                return Math.Abs(ModeledY(model, point.X) - point.Y);
-            }
-            else
-            {
-                return Math.Abs(ModeledX(model, point.Y) - point.X);
-            }
-        }
-
-        // Returns the modeled y-value of an ellipse
-        public static float ModeledY(LineModel model, float x)
-        {
-            if (model != null && model.ValidRegressionModel && model.independentVariable == enmIndependentVariable.X)
-            {
-                return (float)(model.b1 + model.b2 * (double)x);
-            }
-            else
-            {
-                return float.MinValue;
-            }
-        }
-
-        // Returns the modeled x-value of an ellipse
-        public static float ModeledX(LineModel model, float y)
-        {
-            if (model != null && model.ValidRegressionModel && model.independentVariable == enmIndependentVariable.Y)
-            {
-                return (float)(model.b1 + model.b2 * (double)y);
-            }
-            else
-            {
-                return float.MinValue;
-            }
-        }
-
-        private static void CalculateLineFeatures(ref LineModel model)
-        {
-            model.slope = model.b2;
-            model.intercept = model.b1;
-        }
-
-        private static LinearSummations CalculateLinearSummations(enmIndependentVariable independentVariable, List<PointF> points)
-        {
-            var sum = new LinearSummations();
-            if (points == null || points.Count < 2)
-            {
-                sum.N = 0;
                 return sum;
             }
 
-            // Initialize all the summations to zero
-            sum.x = 0.0;
-            sum.y = 0.0;
-            sum.x2 = 0.0;
-            sum.xy = 0.0;
-
-            // Shorthand that better matches the math formulas
-            var N = sum.N = points.Count;
-
-            // Calculate the summations
-            for (var i = 0; i < N; ++i)
+            public override void CalculateModel(Summations sums)
             {
-                // Shorthand
-                var x = points[i].X;
-                var y = points[i].Y;
-
-                // Meh
-                if (independentVariable == enmIndependentVariable.Y)
+                if (sums.N <= 0)
                 {
-                    // Swap the x and y coordinates to handle a y independent variable
-                    x = points[i].Y;
-                    y = points[i].X;
+                    ValidRegressionModel = false;
+                    return;
                 }
 
-                var xx = x * x;
-                var xy = x * y;
+                LinearSummations sum = sums as LinearSummations;
 
-                // Sums
-                sum.x += x;
-                sum.y += y;
-                sum.x2 += xx;
-                sum.xy += xy;
+                // Calculate the means
+                var XMean = sum.x / sum.N;
+                var YMean = sum.y / sum.N;
+
+                // Calculate the S intermediate values
+                var s11 = sum.x2 - (1.0 / sum.N) * sum.x * sum.x;
+                var sY1 = sum.xy - (1.0 / sum.N) * sum.x * sum.y;
+
+                // Don't divide by zero
+                // Note:  Maintaining the matrix notation even though S or s11 is a 1x1 "matrix".  For higher degrees, 
+                //        the notation will remain consistent.
+                var determinantS = s11;
+                if (Math.Abs(determinantS) <= EPSILON)
+                {
+                    ValidRegressionModel = false;
+                }
+
+                // Calculate the coefficients of y = b1 + b2*x
+                b2 = sY1 / determinantS;
+                b1 = YMean - b2 * XMean;
+
+                // Adjust for the bias
+                if (independentVariable == enmIndependentVariable.X)
+                {
+                    b1 = b1 + bias.y - b2 * bias.x;
+                }
+                else
+                {
+                    b1 = b1 + bias.x - b2 * bias.y;
+                }
+
+                ValidRegressionModel = true;
             }
 
-            return sum;
+            public override void CalculateFeatures()
+            {
+                slope = b2;
+                intercept = b1;
+            }
         }
 
-        private static LineModel CalculateInitialLinearModel(LinearSummations sum, Bias bias, enmIndependentVariable independentVariable)
+        public class LinearConsensusModel : RegressionConsensusModel
         {
-            var model = new LineModel();
-            if (sum.N <= 0)
+            public LinearConsensusModel(enmIndependentVariable independentVariable)
             {
-                model.ValidRegressionModel = false;
-                return model;
+                inliers = null;
+                outliers = null;
+                model = new LineModel(independentVariable);
+                original = new LineModel(independentVariable);
             }
 
-            model.bias = bias;
-            model.independentVariable = independentVariable;
-
-            // Calculate the means
-            var XMean = sum.x / (double)sum.N;
-            var YMean = sum.y / (double)sum.N;
-
-            // Calculate the S intermediate values
-            var s11 = sum.x2 - (1.0 / (double)sum.N) * sum.x * sum.x;
-            var sY1 = sum.xy - (1.0 / (double)sum.N) * sum.x * sum.y;
-
-            // Don't divide by zero
-            // Note:  Maintaining the matrix notation even though S or s11 is a 1x1 "matrix".  For higher degrees, 
-            //        the notation will remain consistent.
-            var determinantS = s11;
-            if (Math.Abs(determinantS) <= EPSILON)
+            // Calculate geometric error (Euclidean distance; point-to-line)
+            protected override float CalculateError(RegressionModel model, PointF point, out bool pointOnPositiveSide)
             {
-                model.ValidRegressionModel = false;
-                return model;
+                LineModel line = model as LineModel;
+
+                if (line == null || point == null)
+                {
+                    pointOnPositiveSide = false;
+                    return float.MaxValue;
+                }
+
+                if (line.independentVariable == enmIndependentVariable.X)
+                {
+                    var numerator = -line.b2 * point.X + point.Y - line.b1;
+
+                    pointOnPositiveSide = true;
+                    if (numerator < 0.0f)
+                    {
+                        pointOnPositiveSide = false;
+                    }
+
+                    return (float)(Math.Abs(numerator) / Math.Sqrt(line.b2 * line.b2 + 1.0));
+                }
+                else
+                {
+                    var numerator = -line.b2 * point.Y + point.X - line.b1;
+
+                    pointOnPositiveSide = true;
+                    if (numerator < 0.0f)
+                    {
+                        pointOnPositiveSide = false;
+                    }
+
+                    return (float)(Math.Abs(numerator) / Math.Sqrt(line.b2 * line.b2 + 1.0));
+                }
             }
-
-            // Calculate the coefficients of y = b1 + b2*x
-            model.b2 = sY1 / determinantS;
-            model.b1 = YMean - model.b2 * XMean;
-
-            // Adjust for the bias
-            if (model.independentVariable == enmIndependentVariable.X)
-            {
-                model.b1 = model.b1 + bias.y - model.b2 * bias.x;
-            }
-            else
-            {
-                model.b1 = model.b1 + bias.x - model.b2 * bias.y;
-            }
-
-            model.ValidRegressionModel = true;
-
-            return model;
         }
 
-        public static void UnitTestA1(out List<PointF> anscombe1, out PolynomialModel fit, out List<PointF> outliers, out PolynomialModel orig)
+        public static RegressionConsensusModel CalculateLinearRegressionConsensus(List<PointF> points, enmIndependentVariable independentVariable = enmIndependentVariable.X, float sensitivityInPixels = ERROR_THRESHOLD_ORIGINAL)
+        {
+            var consensus = new LinearConsensusModel(independentVariable);
+            consensus.Calculate(points, sensitivityInPixels);
+
+            return consensus;
+        }
+
+        public static RegressionConsensusModel UnitTestA1(out List<PointF> anscombe1)
         {
             // Anscombe's quartet - https://en.wikipedia.org/wiki/Anscombe%27s_quartet
 
@@ -624,13 +307,10 @@ namespace Tools.RegressionUtilities
             anscombe1.Add(new PointF(7.0f, 4.82f));
             anscombe1.Add(new PointF(5.0f, 5.68f));
 
-            var model_anscombe1a = CalculateLinearRegressionConsensus(anscombe1);
-            fit = model_anscombe1a.model;
-            outliers = model_anscombe1a.outliers;
-            orig = model_anscombe1a.original;
+            return CalculateLinearRegressionConsensus(anscombe1);
         }
 
-        public static void UnitTestA2(out List<PointF> anscombe2, out PolynomialModel fit, out List<PointF> outliers, out PolynomialModel orig)
+        public static RegressionConsensusModel UnitTestA2(out List<PointF> anscombe2)
         {
             // Anscombe's quartet - https://en.wikipedia.org/wiki/Anscombe%27s_quartet
 
@@ -647,13 +327,10 @@ namespace Tools.RegressionUtilities
             anscombe2.Add(new PointF(7.0f, 7.26f));
             anscombe2.Add(new PointF(5.0f, 4.74f));
 
-            var model_anscombe1a = CalculateLinearRegressionConsensus(anscombe2);
-            fit = model_anscombe1a.model;
-            outliers = model_anscombe1a.outliers;
-            orig = model_anscombe1a.original;
+            return CalculateLinearRegressionConsensus(anscombe2);
         }
 
-        public static void UnitTestA3(out List<PointF> anscombe3, out PolynomialModel fit, out List<PointF> outliers, out PolynomialModel orig)
+        public static RegressionConsensusModel UnitTestA3(out List<PointF> anscombe3)
         {
             // Anscombe's quartet - https://en.wikipedia.org/wiki/Anscombe%27s_quartet
 
@@ -670,13 +347,10 @@ namespace Tools.RegressionUtilities
             anscombe3.Add(new PointF(7.0f, 6.42f));
             anscombe3.Add(new PointF(5.0f, 5.73f));
 
-            var model_anscombe3 = CalculateLinearRegressionConsensus(anscombe3);
-            fit = model_anscombe3.model;
-            outliers = model_anscombe3.outliers;
-            orig = model_anscombe3.original;
+            return CalculateLinearRegressionConsensus(anscombe3);
         }
 
-        public static void UnitTestA4(out List<PointF> anscombe4, out PolynomialModel fit, out List<PointF> outliers, out PolynomialModel orig)
+        public static RegressionConsensusModel UnitTestA4(out List<PointF> anscombe4)
         {
             // Anscombe's quartet - https://en.wikipedia.org/wiki/Anscombe%27s_quartet
 
@@ -693,13 +367,10 @@ namespace Tools.RegressionUtilities
             anscombe4.Add(new PointF(8.05f, 7.04f));
             anscombe4.Add(new PointF(19.0f, 12.5f));
 
-            var model_anscombe4 = CalculateLinearRegressionConsensus(anscombe4);
-            fit = model_anscombe4.model;
-            outliers = model_anscombe4.outliers;
-            orig = model_anscombe4.original;
+            return CalculateLinearRegressionConsensus(anscombe4);
         }
 
-        public static void UnitTest1(out List<PointF> points, out PolynomialModel fit, out List<PointF> outliers, out PolynomialModel orig)
+        public static RegressionConsensusModel UnitTest1(out List<PointF> points)
         {
             ////////////////////////////////////////
             // Unit test #1:  Line with slope = 2 //
@@ -728,13 +399,10 @@ namespace Tools.RegressionUtilities
             points.Add(new PointF(5.0f, 11.0f)); // True line point:  y = 2x + 1
             points.Add(new PointF(7.0f, 11.0f)); // <--- Adding in 4.0 noise
 
-            var consensus = CalculateLinearRegressionConsensus(points);
-            fit = consensus.model;
-            outliers = consensus.outliers;
-            orig = consensus.original;
+            return CalculateLinearRegressionConsensus(points);
         }
 
-        public static void UnitTest2(out List<PointF> pointsH, out PolynomialModel fit, out List<PointF> outliers, out PolynomialModel orig)
+        public static RegressionConsensusModel UnitTest2(out List<PointF> pointsH)
         {
             //////////////////////////////////
             // Unit test #2:  Vertical line //
@@ -752,13 +420,10 @@ namespace Tools.RegressionUtilities
             pointsH.Add(new PointF(3.0f, 1.0f));
             pointsH.Add(new PointF(3.0f, 2.0f));
 
-            var modelH = CalculateLinearRegressionConsensus(pointsH, enmIndependentVariable.Y);
-            fit = modelH.model;
-            outliers = modelH.outliers;
-            orig = modelH.original;
+            return CalculateLinearRegressionConsensus(pointsH, enmIndependentVariable.Y);
         }
 
-        public static void UnitTest3(out List<PointF> points3, out PolynomialModel fit, out List<PointF> outliers, out PolynomialModel orig)
+        public static RegressionConsensusModel UnitTest3(out List<PointF> points3)
         {
             //////////////////////////////////////////////////
             // Unit test #3 with bias:  Line with slope = 2 //
@@ -780,13 +445,10 @@ namespace Tools.RegressionUtilities
             points3.Add(new PointF(1505.0f, 11011.0f));
             points3.Add(new PointF(1506.0f, 11013.0f));
 
-            var model3 = CalculateLinearRegressionConsensus(points3);
-            fit = model3.model;
-            outliers = model3.outliers;
-            orig = model3.original;
+            return CalculateLinearRegressionConsensus(points3);
         }
 
-        public static void UnitTest4(out List<PointF> points4, out PolynomialModel fit, out List<PointF> outliers, out PolynomialModel orig)
+        public static RegressionConsensusModel UnitTest4(out List<PointF> points4)
         {
             ////////////////////////////////////////
             // Unit test #4:  Line with slope = 2 //
@@ -820,13 +482,10 @@ namespace Tools.RegressionUtilities
             points4.Add(new PointF(5.0f + (float)noise.NextDouble() / NOISE_LEVEL - HALF, 11.0f + (float)noise.NextDouble() / NOISE_LEVEL - HALF)); // True line point:  y = 2x + 1
             points4.Add(new PointF(7.0f + (float)noise.NextDouble() / NOISE_LEVEL - HALF, 13.0f + (float)noise.NextDouble() / NOISE_LEVEL - HALF)); // <--- Adding in -2.0 noise
 
-            var model4 = CalculateLinearRegressionConsensus(points4);
-            fit = model4.model;
-            outliers = model4.outliers;
-            orig = model4.original;
+            return CalculateLinearRegressionConsensus(points4);
         }
 
-        public static void UnitTest5(out List<PointF> points4, out PolynomialModel fit, out List<PointF> outliers, out PolynomialModel orig)
+        public static RegressionConsensusModel UnitTest5(out List<PointF> points4)
         {
             /////////////////////////////////////////////////////////////////////////////
             // Unit test #4:  Line with slope = 2 meets another line (corner scenario) //
@@ -859,10 +518,7 @@ namespace Tools.RegressionUtilities
             points4.Add(new PointF(8.0f, 8.0f));   // True line point:  y = -x + 16
             points4.Add(new PointF(9.0f, 7.0f));   // True line point:  y = -x + 16
 
-            var model4 = CalculateLinearRegressionConsensus(points4);
-            fit = model4.model;
-            outliers = model4.outliers;
-            orig = model4.original;
+            return CalculateLinearRegressionConsensus(points4);
         }
     }
 }

@@ -179,6 +179,27 @@ namespace RegressionUtilz
             }
         }
 
+        private void DrawCenter(Series series, RegressionModel model, Color color)
+        {
+            series.ChartType = SeriesChartType.Point;
+            series.MarkerBorderColor = color;
+            series.MarkerSize = 10;
+
+            if (model.MinimumPoints == 5)
+            {
+                series.Points.AddXY((model as EllipticalRegression.EllipseModel).X0, (model as EllipticalRegression.EllipseModel).Y0);
+            }
+        }
+
+        private void DrawOrigin(Series series)
+        {
+            series.ChartType = SeriesChartType.Point;
+            series.MarkerBorderColor = Color.Black;
+            series.MarkerColor = Color.Transparent;
+            series.MarkerSize = 10;
+            series.Points.AddXY(0, 0);
+        }
+
         public async Task DisplayRegression(string title = "Title", List<PointF> points = null, RegressionModel consensus = null, List<PointF> outliers = null, RegressionModel orig = null)
         {
             if (points == null || points.Count == 0)
@@ -264,65 +285,68 @@ namespace RegressionUtilz
         private async void DisplayUnitTests()
         {
             List<PointF> points = null;
-            List<PointF> outliers = null;
+            RegressionConsensusModel consensus;
 
-            PolynomialModel fit = null;
-            PolynomialModel orig = null;
-            EllipticalRegression.EllipseModel fitEllipse = null;
-            EllipticalRegression.EllipseModel origEllipse = null;
+            consensus = LinearRegression.UnitTest4(out points);
+            await DisplayRegression("Consensus Regression splits data points into inliers and outliers\nSimilar to RANSAC except it starts with all points and removes outliers 1 by 1", points, consensus.Model, consensus.Outliers, consensus.Original);
+            consensus = LinearRegression.UnitTest5(out points);
+            await DisplayRegression("Linear Regression 3 - corner", points, consensus.Model, consensus.Outliers, consensus.Original);
 
-            LinearRegression.UnitTest4(out points, out fit, out outliers, out orig);
-            await DisplayRegression("Consensus Regression splits data points into inliers and outliers\nSimilar to RANSAC except it starts with all points and removes outliers 1 by 1", points, fit, outliers, orig);
-            LinearRegression.UnitTest5(out points, out fit, out outliers, out orig);
-            await DisplayRegression("Linear Regression 3 - corner", points, fit, outliers, orig);
+            consensus = LinearRegression.UnitTestA1(out points);
+            await DisplayRegression("Linear Regression A1 - Anscombe's Quartet\n1st (all 4 Anscombe's datasets have same original linear regression)", points, consensus.Model, consensus.Outliers, consensus.Original);
+            consensus = LinearRegression.UnitTestA3(out points);
+            await DisplayRegression("Linear Regression A3 - Anscombe's Quartet\n3rd (all 4 Anscombe's datasets have same original linear regression)", points, consensus.Model, consensus.Outliers, consensus.Original);
+            consensus = LinearRegression.UnitTestA4(out points);
+            await DisplayRegression("Linear Regression A4 - Anscombe's Quartet\n4th (all 4 Anscombe's datasets have same linear regression)", points, consensus.Model, consensus.Outliers, consensus.Original);
+            consensus = LinearRegression.UnitTestA2(out points);
+            await DisplayRegression("Linear Regression A2 - Anscombe's Quartet\n 2nd (all 4 Anscombe's datasets have same linear regression)", points, null, null, consensus.Original);
+            consensus = QuadraticRegression.UnitTestA2(out points);
+            await DisplayRegression("Quadratic Regression A2 - Anscombe's Quartet\n2nd (all 4 Anscombe's datasets have same linear regression)", points, consensus.Model, consensus.Outliers, consensus.Original);
 
-            LinearRegression.UnitTestA1(out points, out fit, out outliers, out orig);
-            await DisplayRegression("Linear Regression A1 - Anscombe's Quartet\n1st (all 4 Anscombe's datasets have same original linear regression)", points, fit, outliers, orig);
-            LinearRegression.UnitTestA3(out points, out fit, out outliers, out orig);
-            await DisplayRegression("Linear Regression A3 - Anscombe's Quartet\n3rd (all 4 Anscombe's datasets have same original linear regression)", points, fit, outliers, orig);
-            LinearRegression.UnitTestA4(out points, out fit, out outliers, out orig);
-            await DisplayRegression("Linear Regression A4 - Anscombe's Quartet\n4th (all 4 Anscombe's datasets have same linear regression)", points, fit, outliers, orig);
-            LinearRegression.UnitTestA2(out points, out fit, out outliers, out orig);
-            await DisplayRegression("Linear Regression A2 - Anscombe's Quartet\n 2nd (all 4 Anscombe's datasets have same linear regression)", points, null, null, orig);
-            QuadraticRegression.UnitTestA2(out points, out fit, out outliers, out orig);
-            await DisplayRegression("Quadratic Regression A2 - Anscombe's Quartet\n2nd (all 4 Anscombe's datasets have same linear regression)", points, fit, outliers, orig);
+            consensus = QuadraticRegression.UnitTest1(out points);
+            await DisplayRegression("Quadratic Test 1 - Vertical Parabola, no outliers", points, consensus.Model, consensus.Outliers, consensus.Original);
+            consensus = QuadraticRegression.UnitTest3(out points);
+            await DisplayRegression("Quadratic Test 2 - Horizontal Parabola, no outliers", points, consensus.Model, consensus.Outliers, consensus.Original);
+            consensus = QuadraticRegression.UnitTest5(out points);
+            await DisplayRegression("Quadratic Test 3 - One outlier", points, consensus.Model, consensus.Outliers, consensus.Original);
+            consensus = QuadraticRegression.UnitTest6(out points);
+            await DisplayRegression("Quadratic Test 4 - One outlier", points, consensus.Model, consensus.Outliers, consensus.Original);
+            consensus = QuadraticRegression.UnitTest7(out points);
+            await DisplayRegression("Quadratic Test 5 - Real data", points, consensus.Model, consensus.Outliers, consensus.Original);
+            consensus = QuadraticRegression.UnitTest8(out points);
+            await DisplayRegression("Quadratic Test 6 - Real data, plus syn outliers", points, consensus.Model, consensus.Outliers, consensus.Original);
+            consensus = QuadraticRegression.UnitTest9(out points);
+            await DisplayRegression("Quadratic Test 7 - Real data, plus syn outliers", points, consensus.Model, consensus.Outliers, consensus.Original);
 
-            QuadraticRegression.UnitTest1(out points, out fit, out outliers, out orig);
-            await DisplayRegression("Quadratic Test 1 - Vertical Parabola, no outliers", points, fit, outliers, orig);
-            QuadraticRegression.UnitTest3(out points, out fit, out outliers, out orig);
-            await DisplayRegression("Quadratic Test 2 - Horizontal Parabola, no outliers", points, fit, outliers, orig);
-            QuadraticRegression.UnitTest5(out points, out fit, out outliers, out orig);
-            await DisplayRegression("Quadratic Test 3 - One outlier", points, fit, outliers, orig);
-            QuadraticRegression.UnitTest6(out points, out fit, out outliers, out orig);
-            await DisplayRegression("Quadratic Test 4 - One outlier", points, fit, outliers, orig);
-            QuadraticRegression.UnitTest7(out points, out fit, out outliers, out orig);
-            await DisplayRegression("Quadratic Test 5 - Real data", points, fit, outliers, orig);
-            QuadraticRegression.UnitTest8(out points, out fit, out outliers, out orig);
-            await DisplayRegression("Quadratic Test 6 - Real data, plus syn outliers", points, fit, outliers, orig);
-            QuadraticRegression.UnitTest9(out points, out fit, out outliers, out orig);
-            await DisplayRegression("Quadratic Test 7 - Real data, plus syn outliers", points, fit, outliers, orig);
+            consensus = CubicRegression.UnitTest2(out points);
+            await DisplayRegression("Cubic Test 1 - No outliers", points, consensus.Model, consensus.Outliers, consensus.Original);
+            consensus = CubicRegression.UnitTest3(out points);
+            await DisplayRegression("Cubic Test 2 - No outliers, y-independent", points, consensus.Model, consensus.Outliers, consensus.Original);
+            consensus = CubicRegression.UnitTest12(out points);
+            await DisplayRegression("Cubic Test 3 - real data", points, consensus.Model, consensus.Outliers, consensus.Original);
+            consensus = CubicRegression.UnitTest8(out points);
+            await DisplayRegression("Cubic Test 4 - cubic to quadratic data", points, consensus.Model, consensus.Outliers, consensus.Original);
 
-            CubicRegression.UnitTest2(out points, out fit, out outliers, out orig);
-            await DisplayRegression("Cubic Test 1 - No outliers", points, fit, outliers, orig);
-            CubicRegression.UnitTest3(out points, out fit, out outliers, out orig);
-            await DisplayRegression("Cubic Test 2 - No outliers, y-independent", points, fit, outliers, orig);
-            CubicRegression.UnitTest12(out points, out fit, out outliers, out orig);
-            await DisplayRegression("Cubic Test 3 - real data", points, fit, outliers, orig);
-            CubicRegression.UnitTest8(out points, out fit, out outliers, out orig);
-            await DisplayRegression("Cubic Test 4 - cubic to quadratic data", points, fit, outliers, orig);
+            consensus = EllipticalRegression.UnitTest1(out points);
+            await DisplayRegression("Elliptical Test 1 - No outliers", points, consensus.Model, consensus.Outliers, consensus.Original);
+            consensus = EllipticalRegression.UnitTest3(out points);
+            await DisplayRegression("Elliptical Test 2 - 30 degree rotation", points, consensus.Model, consensus.Outliers, consensus.Original);
+            consensus = EllipticalRegression.UnitTest4(out points);
+            await DisplayRegression("Elliptical Test 3 - 1 internal outlier", points, consensus.Model, consensus.Outliers, consensus.Original);
+            consensus = EllipticalRegression.UnitTest5(out points);
+            await DisplayRegression("Elliptical Test 4 - 3 external outliers", points, consensus.Model, consensus.Outliers, consensus.Original);
+            consensus = EllipticalRegression.UnitTest6(out points);
+            await DisplayRegression("Elliptical Test 5 - 2 external outliers", points, consensus.Model, consensus.Outliers, consensus.Original);
 
-
-            EllipticalRegression.UnitTest1(out points, out fitEllipse, out outliers, out origEllipse);
-            await DisplayRegression("Elliptical Test 1 - No outliers", points, fitEllipse, outliers, origEllipse);
-            EllipticalRegression.UnitTest3(out points, out fitEllipse, out outliers, out origEllipse);
-            await DisplayRegression("Elliptical Test 2 - 30 degree rotation", points, fitEllipse, outliers, origEllipse);
-            EllipticalRegression.UnitTest4(out points, out fitEllipse, out outliers, out origEllipse);
-            await DisplayRegression("Elliptical Test 3 - 1 internal outlier", points, fitEllipse, outliers, origEllipse);
-            EllipticalRegression.UnitTest5(out points, out fitEllipse, out outliers, out origEllipse);
-            await DisplayRegression("Elliptical Test 4 - 3 external outliers", points, fitEllipse, outliers, origEllipse);
-            EllipticalRegression.UnitTest6(out points, out fitEllipse, out outliers, out origEllipse);
-            await DisplayRegression("Elliptical Test 5 - 2 external outliers", points, fitEllipse, outliers, origEllipse);
-
+            // Extras
+            //consensus = LinearRegression.UnitTest1(out points);
+            //await DisplayRegression("Linear Test 1 - ", points, consensus.Model, consensus.Outliers, consensus.Original);
+            //consensus = LinearRegression.UnitTest2(out points);
+            //await DisplayRegression("Linear Test 2 - ", points, consensus.Model, consensus.Outliers, consensus.Original);
+            //consensus = LinearRegression.UnitTest3(out points);
+            //await DisplayRegression("Linear Test 3 - ", points, consensus.Model, consensus.Outliers, consensus.Original);
+            //consensus = EllipticalRegression.UnitTest2(out points);
+            //await DisplayRegression("Elliptical Test 2 - No outliers", points, consensus.Model, consensus.Outliers, consensus.Original);
 
             this.Close();
         }

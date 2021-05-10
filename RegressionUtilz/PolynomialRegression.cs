@@ -28,12 +28,16 @@ namespace Tools.RegressionUtilities
         };                                          //   Quadratic, y-independent:  Horizontal parabola
         public enmIndependentVariable independentVariable;
 
-        public PolynomialModel()
+        protected PolynomialModel()
         {
-            _validRegressionModel = false;
-            _averageResidual = float.MaxValue;
             independentVariable = enmIndependentVariable.X;
-            _degree = DegreeOfPolynomial.Quadratic;
+            _degree = DegreeOfPolynomial.Linear;
+        }
+
+        protected PolynomialModel(PolynomialModel copy) : base(copy)
+        {
+            independentVariable = copy.independentVariable;
+            _degree = copy._degree;
         }
 
         // Returns the modeled y-value of a regression model with independent x-variable
